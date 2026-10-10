@@ -2,7 +2,9 @@
 
 Multi-tenant AI messaging and booking platform for clinics. It answers patient questions from each clinic's own knowledge base (hybrid retrieval), books / reschedules / cancels appointments through LLM tool calls, and lets staff take over any conversation with the full history intact. Bilingual Arabic/English admin, RTL included.
 
-**Status:** under construction. Marked `DONE` in the portfolio skill only after: live demo + public repo + README + 60s recording + cover image.
+**Live demo:** https://radd-sable.vercel.app · **Demo login:** one click on the login page (or `demo@radd.app` / `demo1234`, clinic "عيادة النور التخصصية").
+
+**Status:** live + public repo + README done. Marked `DONE` in the portfolio skill only after the 60s recording + cover image are added.
 
 ## Stack
 
@@ -24,6 +26,29 @@ pnpm dev
 One-click demo login and "Reset demo data" ship with the app — the seeded data is what the public demo runs on.
 
 ## Architecture
+
+```mermaid
+flowchart LR
+  subgraph clients
+    P[Patient<br/>web chat / Messenger / Instagram]
+    S[Staff<br/>inbox UI]
+  end
+  subgraph app["Next.js on Vercel"]
+    W[Channel adapters<br/>+ simulator]
+    A[Route handlers<br/>Zod · session · clinic scope]
+    AI[AI layer<br/>allowlisted tools:<br/>book / reschedule / cancel]
+    R[Hybrid RAG<br/>FTS + pgvector<br/>rank fusion]
+    J[Jobs runner<br/>after() + daily cron<br/>FOR UPDATE SKIP LOCKED]
+  end
+  DB[(Neon Postgres<br/>multi-tenant data + jobs table)]
+  P --> W --> A
+  S --> A
+  A --> AI --> R
+  A --> J
+  A <--> DB
+  R <--> DB
+  J <--> DB
+```
 
 ```
 src/
