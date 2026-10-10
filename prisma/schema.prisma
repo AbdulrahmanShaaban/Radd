@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  RECEPTIONIST
+  DOCTOR
+}
+
+enum Channel {
+  WEB
+  SIMULATOR
+  WHATSAPP
+  MESSENGER
+  INSTAGRAM
+  LINE
+}
+
+enum ConversationState {
+  AI
+  HUMAN
+  CLOSED
+}
+
+enum MessageAuthor {
+  USER
+  AI
+  HUMAN
+  SYSTEM
+}
+
+enum DocStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum AppointmentStatus {
+  BOOKED
+  RESCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  DEAD
+}
+
+model Clinic {
+  id           String         @id @default(cuid())
+  name         String
+  slug         String         @unique
+  locale       String         @default("ar")
+  timezone     String         @default("Africa/Cairo")
+  createdAt    DateTime       @default(now())
+  users        User[]
+  patients     Patient[]
+  conversations Conversation[]
+  documents    KbDocument[]
+  appointments Appointment[]
+  messages     Message[]
+  jobs         Job[]
+
+  @@map("clinics")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  clinicId     String
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(RECEPTIONIST)
+  createdAt    DateTime @default(now())
+  clinic       Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  sessions     Session[]
+
+  @@index([clinicId])
+  @@map("users")
+}
+
+/// Opaque server-side session. The cookie holds a random token; only its
+/// SHA-256 is stored here, so a database leak cannot be replayed as a session.
+model Session {
+  id        String   @id // sha256(token)
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Patient {
+  id        String   @id @default(cuid())
+  clinicId  String
+  name      String
+  phone     String
+  locale    String   @default("ar")
+  createdAt DateTime @default(now())
+  clinic    Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  conversations Conversation[]
+  appointments  Appointment[]
+
+  @@unique([clinicId, phone])
+  @@index([clinicId])
+  @@map("patients")
+}
+
+model Conversation {
+  id            String           @id @default(cuid())
+  clinicId      String
+  patientId     String
+  channel       Channel          @default(SIMULATOR)
+  state         ConversationState @default(AI)
+  aiEnabled     Boolean          @default(true)
+  lastMessageAt DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+  clinic        Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient       Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  messages      Message[]
+
+  @@index([clinicId, lastMessageAt(sort: Desc)])
+  @@index([clinicId, state])
+  @@map("conversations")
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  clinicId       String
+  conversationId String
+  author         MessageAuthor
+  content        String
+  meta           Json?
+  createdAt      DateTime      @default(now())
+  clinic         Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([clinicId])
+  @@map("messages")
+}
+
+model KbDocument {
+  id         String    @id @default(cuid())
+  clinicId   String
+  title      String
+  source     String    @default("upload")
+  status     DocStatus @default(PROCESSING)
+  error      String?
+  chunkCount Int       @default(0)
+  createdAt  DateTime  @default(now())
+  clinic     Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  chunks     KbChunk[]
+
+  @@index([clinicId, status])
+  @@map("kb_documents")
+}
+
+model KbChunk {
+  id         String      @id @default(cuid())
+  documentId String
+  clinicId   String
+  idx        Int
+  content    String
+  embedding  Unsupported("vector(1536)")?
+  document   KbDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([clinicId])
+  @@map("kb_chunks")
+}
+
+model Appointment {
+  id        String            @id @default(cuid())
+  clinicId  String
+  patientId String
+  startsAt  DateTime
+  endsAt    DateTime
+  kind      String            @default("visit")
+  status    AppointmentStatus @default(BOOKED)
+  note      String?
+  createdAt DateTime          @default(now())
+  clinic    Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient   Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId, startsAt])
+  @@map("appointments")
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  clinicId    String?
+  type        String
+  payload     Json
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  runAt       DateTime  @default(now())
+  lockedAt    DateTime?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  clinic      Clinic?   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAt])
+  @@map("jobs")
+}
+
+model EvalCase {
+  id         String     @id @default(cuid())
+  question   String
+  mustContain String[]
+  active     Boolean    @default(true)
+  runs       EvalRun[]
+
+  @@map("eval_cases")
+}
+
+model EvalRun {
+  id        String   @id @default(cuid())
+  caseId    String
+  passed    Boolean
+  hit       Boolean
+  latencyMs Int
+  createdAt DateTime @default(now())
+  case      EvalCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt(sort: Desc)])
+  @@map("eval_runs")
+}
+
+model RateLimit {
+  id          String   @id @default(cuid())
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@unique([key, windowStart])
+  @@map("rate_limits")
+}
+
+model UsageDaily {
+  day       String   @id
+  tokensIn  Int      @default(0)
+  tokensOut Int      @default(0)
+  costUsd   Decimal  @default(0) @db.Decimal(10, 6)
+
+  @@map("usage_daily")
+}
