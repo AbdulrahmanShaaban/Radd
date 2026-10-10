@@ -8,7 +8,8 @@
   - Note: an external process occasionally locks `tsc.exe` (`EBUSY` — same class as the historical esbuild.exe/schema-engine locks). Workaround: copy `node_modules/.pnpm/@typescript+typescript-win32-x64*/node_modules/@typescript/typescript-win32-x64/lib` to `%TEMP%` and run `tsc.exe --noEmit` from the project root.
 
 ## Next
-- [ ] Push code to GitHub (repo not created yet — needs user's go-ahead; `gh` CLI not installed)
+- [x] GitHub push: https://github.com/AbdulrahmanShaaban/Radd (master, 2 commits: app + README) (2026-10-10)
+- [ ] Radd DONE-gate leftovers: 60-second screen recording + cover image (manual/media step)
 
 ## Recently Completed
 - [x] **Deploy**: Neon migrate+seed, Vercel env (`DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `EMBED_PROVIDER=mock`, `DAILY_SPEND_CAP_USD`, `NEXT_PUBLIC_APP_URL`), `vercel --prod`, smoke-tested end-to-end (2026-10-10)
